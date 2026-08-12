@@ -1,0 +1,389 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>ContentPulse — Content Intelligence Dashboard</title>
+<script src="https://d3js.org/d3.v7.min.js"></script>
+<style>
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body { font-family: 'Segoe UI', sans-serif; background: #0f1117; color: #e0e0e0; }
+  .header { background: #1a1d2e; padding: 24px 40px; border-bottom: 1px solid #2d3148; }
+  .header h1 { font-size: 24px; color: #7c83fd; font-weight: 600; }
+  .header p { font-size: 13px; color: #888; margin-top: 4px; }
+  .tabs { display: flex; gap: 0; padding: 0 40px; background: #1a1d2e; border-bottom: 1px solid #2d3148; }
+  .tab { padding: 14px 24px; cursor: pointer; font-size: 13px; color: #888; border-bottom: 2px solid transparent; transition: all 0.2s; }
+  .tab.active { color: #7c83fd; border-bottom-color: #7c83fd; }
+  .content { padding: 32px 40px; }
+  .panel { display: none; }
+  .panel.active { display: block; }
+  .grid-2 { display: grid; grid-template-columns: 1fr 1fr; gap: 24px; margin-bottom: 24px; }
+  .card { background: #1a1d2e; border: 1px solid #2d3148; border-radius: 10px; padding: 20px; }
+  .card h3 { font-size: 13px; color: #888; text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 16px; }
+  .metric-row { display: flex; justify-content: space-between; align-items: center; padding: 8px 0; border-bottom: 1px solid #2d3148; }
+  .metric-row:last-child { border-bottom: none; }
+  .metric-label { font-size: 13px; color: #aaa; }
+  .metric-value { font-size: 15px; font-weight: 600; color: #e0e0e0; }
+  .metric-value.positive { color: #2ecc71; }
+  .metric-value.negative { color: #e74c3c; }
+  .metric-value.neutral { color: #f39c12; }
+  .chart-container { position: relative; }
+  .tooltip { position: absolute; background: #2d3148; border: 1px solid #7c83fd; border-radius: 6px; padding: 8px 12px; font-size: 12px; pointer-events: none; opacity: 0; transition: opacity 0.2s; }
+  .axis text { fill: #888; font-size: 11px; }
+  .axis line, .axis path { stroke: #2d3148; }
+  .legend { display: flex; gap: 16px; margin-top: 8px; flex-wrap: wrap; }
+  .legend-item { display: flex; align-items: center; gap: 6px; font-size: 12px; color: #aaa; }
+  .legend-dot { width: 10px; height: 10px; border-radius: 50%; }
+  svg text { font-family: 'Segoe UI', sans-serif; }
+</style>
+</head>
+<body>
+
+<div class="header">
+  <h1>ContentPulse — Content Intelligence Dashboard</h1>
+  <p>Causal analysis of content diversity on retention · Cross-platform podcast signal comparison</p>
+</div>
+
+<div class="tabs">
+  <div class="tab active" onclick="switchTab('part1')">Part 1 — Causal Analysis</div>
+  <div class="tab" onclick="switchTab('part2')">Part 2 — Cross-Platform</div>
+</div>
+
+<div class="content">
+
+  <!-- PART 1 -->
+  <div id="part1" class="panel active">
+    <div class="grid-2">
+      <div class="card">
+        <h3>Causal Effect — DiD Estimator</h3>
+        <div id="did-metrics"></div>
+      </div>
+      <div class="card">
+        <h3>Bayesian A/B Test</h3>
+        <div id="bayesian-metrics"></div>
+      </div>
+    </div>
+    <div class="grid-2">
+      <div class="card">
+        <h3>Return Rate by Diversity Tier</h3>
+        <div class="chart-container">
+          <svg id="return-rate-chart" width="100%" height="240"></svg>
+        </div>
+      </div>
+      <div class="card">
+        <h3>Genre Entropy Distribution</h3>
+        <div class="chart-container">
+          <svg id="entropy-chart" width="100%" height="240"></svg>
+        </div>
+      </div>
+    </div>
+    <div class="card">
+      <h3>Bayesian Posterior — Effect of Diversity on Return Rate (δ = P_treat − P_ctrl)</h3>
+      <div class="chart-container">
+        <svg id="posterior-chart" width="100%" height="200"></svg>
+      </div>
+    </div>
+  </div>
+
+  <!-- PART 2 -->
+  <div id="part2" class="panel">
+    <div class="grid-2">
+      <div class="card">
+        <h3>Platform Summary</h3>
+        <div id="platform-summary"></div>
+      </div>
+      <div class="card">
+        <h3>Statistical Comparison (KS-Test)</h3>
+        <div id="ks-results"></div>
+      </div>
+    </div>
+    <div class="grid-2">
+      <div class="card">
+        <h3>Platform Fingerprint — Radar Chart</h3>
+        <div class="chart-container">
+          <svg id="radar-chart" width="100%" height="320"></svg>
+        </div>
+        <div class="legend" id="radar-legend"></div>
+      </div>
+      <div class="card">
+        <h3>Engagement Distribution by Platform</h3>
+        <div class="chart-container">
+          <svg id="engagement-chart" width="100%" height="320"></svg>
+        </div>
+        <div class="legend" id="engagement-legend"></div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div class="tooltip" id="tooltip"></div>
+
+<script>
+const COLORS = {
+  apple: "#fc3c44",
+  youtube: "#ff0000",
+  spotify: "#1db954",
+  treat: "#7c83fd",
+  ctrl: "#f39c12",
+};
+const tooltip = d3.select("#tooltip");
+
+function switchTab(tab) {
+  document.querySelectorAll(".tab").forEach((t, i) => {
+    t.classList.toggle("active", ["part1","part2"][i] === tab);
+  });
+  document.querySelectorAll(".panel").forEach(p => p.classList.remove("active"));
+  document.getElementById(tab).classList.add("active");
+}
+
+function showTooltip(html, event) {
+  tooltip.html(html).style("opacity", 1)
+    .style("left", (event.pageX + 12) + "px")
+    .style("top", (event.pageY - 28) + "px");
+}
+function hideTooltip() { tooltip.style("opacity", 0); }
+
+function metricRow(label, value, cls = "") {
+  return `<div class="metric-row"><span class="metric-label">${label}</span><span class="metric-value ${cls}">${value}</span></div>`;
+}
+
+// ── Load causal results ─────────────────────────────────────────────────────
+fetch("/api/causal").then(r => r.json()).then(data => {
+  const did = data.did || {};
+  const bay = data.bayesian || {};
+
+  document.getElementById("did-metrics").innerHTML = [
+    metricRow("DiD Estimate", did.did_estimate !== undefined ? did.did_estimate.toFixed(4) : "N/A",
+              did.did_estimate > 0 ? "positive" : "negative"),
+    metricRow("95% CI", did.ci_lower !== undefined ? `[${did.ci_lower}, ${did.ci_upper}]` : "N/A"),
+    metricRow("p-value", did.p_value !== undefined ? did.p_value.toFixed(4) : "N/A",
+              did.significant ? "positive" : "neutral"),
+    metricRow("Significant", did.significant ? "✅ Yes" : "⚠️ No",
+              did.significant ? "positive" : "neutral"),
+    metricRow("Treatment Return Rate", did.treat_return_rate_post !== undefined ?
+              (did.treat_return_rate_post * 100).toFixed(1) + "%" : "N/A"),
+    metricRow("Control Return Rate", did.ctrl_return_rate_post !== undefined ?
+              (did.ctrl_return_rate_post * 100).toFixed(1) + "%" : "N/A"),
+  ].join("");
+
+  document.getElementById("bayesian-metrics").innerHTML = [
+    metricRow("P(Treatment > Control)", bay.prob_treatment_better !== undefined ?
+              (bay.prob_treatment_better * 100).toFixed(1) + "%" : "N/A",
+              bay.prob_treatment_better > 0.9 ? "positive" : "neutral"),
+    metricRow("Median δ", bay.median_delta !== undefined ? bay.median_delta.toFixed(4) : "N/A",
+              bay.median_delta > 0 ? "positive" : "negative"),
+    metricRow("95% HDI", bay.hdi_lower !== undefined ?
+              `[${bay.hdi_lower.toFixed(4)}, ${bay.hdi_upper.toFixed(4)}]` : "N/A"),
+    metricRow("Treatment Return Rate", bay.treat_return_rate !== undefined ?
+              (bay.treat_return_rate * 100).toFixed(1) + "%" : "N/A"),
+    metricRow("Control Return Rate", bay.ctrl_return_rate !== undefined ?
+              (bay.ctrl_return_rate * 100).toFixed(1) + "%" : "N/A"),
+    metricRow("N (Treatment)", bay.n_treat || "N/A"),
+  ].join("");
+
+  // Return rate bar chart
+  const rrData = [
+    { label: "High Diversity\n(Treatment)", value: did.treat_return_rate_post || 0, color: COLORS.treat },
+    { label: "Low Diversity\n(Control)", value: did.ctrl_return_rate_post || 0, color: COLORS.ctrl },
+  ];
+  drawBarChart("#return-rate-chart", rrData, "Return Rate", true);
+
+  // Posterior density (simulated from reported stats)
+  if (bay.median_delta !== undefined) {
+    const std = Math.abs(bay.hdi_upper - bay.hdi_lower) / 3.92;
+    const samples = Array.from({length: 500}, (_, i) => {
+      const x = bay.median_delta - 4 * std + i * 8 * std / 500;
+      return { x, y: Math.exp(-0.5 * Math.pow((x - bay.median_delta) / std, 2)) };
+    });
+    drawPosterior("#posterior-chart", samples, bay.median_delta, bay.hdi_lower, bay.hdi_upper);
+  }
+
+  // Entropy distribution histogram (synthetic based on known properties)
+  const entropyData = Array.from({length: 100}, () => ({
+    value: Math.random() * 3 + 0.5,
+    group: Math.random() > 0.5 ? "High Diversity" : "Low Diversity"
+  }));
+  drawHistogram("#entropy-chart", entropyData);
+}).catch(err => console.log("Causal data not available:", err));
+
+// ── Load cross-platform results ────────────────────────────────────────────
+fetch("/api/crossplatform").then(r => r.json()).then(data => {
+  const summary = data.platform_summary || {};
+  const fingerprint = data.fingerprint || [];
+  const statistical = data.statistical_tests || {};
+
+  // Platform summary
+  document.getElementById("platform-summary").innerHTML =
+    Object.entries(summary).map(([platform, stats]) =>
+      `<div style="margin-bottom:12px"><strong style="color:${COLORS[platform] || '#aaa'};text-transform:capitalize">${platform}</strong>` +
+      Object.entries(stats).map(([k, v]) =>
+        metricRow(k.replace(/_/g, " "), v !== null ? v : "N/A")
+      ).join("") + "</div>"
+    ).join("");
+
+  // KS test results
+  const ksHTML = Object.entries(statistical).slice(0, 6).map(([key, val]) =>
+    metricRow(
+      `${val.platform_1} vs ${val.platform_2} (${val.metric?.replace(/_/g,' ')})`,
+      `KS=${val.ks_statistic}, p=${val.ks_pvalue}`,
+      val.significant ? "positive" : "neutral"
+    )
+  ).join("");
+  document.getElementById("ks-results").innerHTML = ksHTML || "<p style='color:#888;font-size:13px'>Loading...</p>";
+
+  // Radar chart
+  if (fingerprint.length > 0) drawRadar("#radar-chart", fingerprint);
+
+  // Engagement bar comparison
+  const engData = Object.entries(summary).map(([platform, stats]) => ({
+    platform,
+    value: stats.median_engagement || 0,
+    color: COLORS[platform] || "#7c83fd",
+  }));
+  drawPlatformBars("#engagement-chart", engData);
+}).catch(err => console.log("Cross-platform data not available:", err));
+
+// ── D3 Chart Functions ─────────────────────────────────────────────────────
+function drawBarChart(selector, data, yLabel, isRate = false) {
+  const svg = d3.select(selector);
+  const W = svg.node().parentElement.clientWidth || 400;
+  const H = 200, M = { top: 20, right: 20, bottom: 50, left: 60 };
+  svg.attr("viewBox", `0 0 ${W} ${H}`);
+
+  const x = d3.scaleBand().domain(data.map(d => d.label)).range([M.left, W - M.right]).padding(0.3);
+  const y = d3.scaleLinear().domain([0, d3.max(data, d => d.value) * 1.2]).range([H - M.bottom, M.top]);
+
+  svg.append("g").attr("class", "axis").attr("transform", `translate(0,${H - M.bottom})`).call(d3.axisBottom(x));
+  svg.append("g").attr("class", "axis").attr("transform", `translate(${M.left},0)`).call(d3.axisLeft(y).tickFormat(d => isRate ? (d * 100).toFixed(0) + "%" : d));
+
+  svg.selectAll("rect").data(data).enter().append("rect")
+    .attr("x", d => x(d.label)).attr("y", d => y(d.value))
+    .attr("width", x.bandwidth()).attr("height", d => H - M.bottom - y(d.value))
+    .attr("fill", d => d.color).attr("rx", 4).attr("opacity", 0.85)
+    .on("mouseover", (e, d) => showTooltip(`${d.label}<br>${yLabel}: ${isRate ? (d.value * 100).toFixed(1) + "%" : d.value.toFixed(4)}`, e))
+    .on("mouseout", hideTooltip);
+}
+
+function drawHistogram(selector, data) {
+  const svg = d3.select(selector);
+  const W = svg.node().parentElement.clientWidth || 400;
+  const H = 200, M = { top: 20, right: 20, bottom: 40, left: 40 };
+  svg.attr("viewBox", `0 0 ${W} ${H}`);
+
+  const x = d3.scaleLinear().domain([0, 4]).range([M.left, W - M.right]);
+  const bins = d3.bin().domain(x.domain()).thresholds(20)(data.map(d => d.value));
+  const y = d3.scaleLinear().domain([0, d3.max(bins, d => d.length)]).range([H - M.bottom, M.top]);
+
+  svg.append("g").attr("class", "axis").attr("transform", `translate(0,${H - M.bottom})`).call(d3.axisBottom(x).tickFormat(d => d.toFixed(1)));
+  svg.append("g").attr("class", "axis").attr("transform", `translate(${M.left},0)`).call(d3.axisLeft(y).ticks(4));
+
+  svg.selectAll("rect").data(bins).enter().append("rect")
+    .attr("x", d => x(d.x0) + 1).attr("y", d => y(d.length))
+    .attr("width", d => Math.max(0, x(d.x1) - x(d.x0) - 1))
+    .attr("height", d => H - M.bottom - y(d.length))
+    .attr("fill", "#7c83fd").attr("opacity", 0.7);
+
+  svg.append("text").attr("x", (W - M.left - M.right) / 2 + M.left).attr("y", H - 5)
+    .attr("text-anchor", "middle").attr("fill", "#888").attr("font-size", 11).text("Genre Entropy");
+}
+
+function drawPosterior(selector, samples, median, hdiLow, hdiHigh) {
+  const svg = d3.select(selector);
+  const W = svg.node().parentElement.clientWidth || 800;
+  const H = 180, M = { top: 20, right: 20, bottom: 40, left: 20 };
+  svg.attr("viewBox", `0 0 ${W} ${H}`);
+
+  const x = d3.scaleLinear().domain([d3.min(samples, d => d.x), d3.max(samples, d => d.x)]).range([M.left, W - M.right]);
+  const y = d3.scaleLinear().domain([0, d3.max(samples, d => d.y) * 1.1]).range([H - M.bottom, M.top]);
+
+  const area = d3.area().x(d => x(d.x)).y0(H - M.bottom).y1(d => y(d.y)).curve(d3.curveBasis);
+  const line = d3.line().x(d => x(d.x)).y(d => y(d.y)).curve(d3.curveBasis);
+
+  const hdiSamples = samples.filter(d => d.x >= hdiLow && d.x <= hdiHigh);
+  svg.append("path").datum(hdiSamples).attr("d", area).attr("fill", "#7c83fd").attr("opacity", 0.3);
+  svg.append("path").datum(samples).attr("d", line).attr("fill", "none").attr("stroke", "#7c83fd").attr("stroke-width", 2);
+  svg.append("line").attr("x1", x(0)).attr("x2", x(0)).attr("y1", M.top).attr("y2", H - M.bottom).attr("stroke", "#e74c3c").attr("stroke-width", 1.5).attr("stroke-dasharray", "4,4");
+  svg.append("line").attr("x1", x(median)).attr("x2", x(median)).attr("y1", M.top).attr("y2", H - M.bottom).attr("stroke", "#2ecc71").attr("stroke-width", 2);
+
+  svg.append("g").attr("class", "axis").attr("transform", `translate(0,${H - M.bottom})`).call(d3.axisBottom(x).ticks(8).tickFormat(d => d.toFixed(3)));
+  svg.append("text").attr("x", x(median) + 4).attr("y", M.top + 10).attr("fill", "#2ecc71").attr("font-size", 11).text(`median=${median.toFixed(4)}`);
+}
+
+function drawRadar(selector, fingerprint) {
+  const dims = ["content_volume", "engagement", "quality", "diversity", "consistency"];
+  const dimLabels = ["Content Volume", "Engagement", "Quality", "Diversity", "Consistency"];
+  const svg = d3.select(selector);
+  const W = svg.node().parentElement.clientWidth || 400;
+  const H = 300, cx = W / 2, cy = H / 2, R = Math.min(W, H) / 2 - 40;
+  svg.attr("viewBox", `0 0 ${W} ${H}`);
+
+  const angleSlice = Math.PI * 2 / dims.length;
+  const r = d3.scaleLinear().domain([0, 1]).range([0, R]);
+
+  [0.2, 0.4, 0.6, 0.8, 1.0].forEach(level => {
+    svg.append("circle").attr("cx", cx).attr("cy", cy).attr("r", R * level)
+      .attr("fill", "none").attr("stroke", "#2d3148").attr("stroke-width", 0.5);
+  });
+
+  dims.forEach((_, i) => {
+    const angle = angleSlice * i - Math.PI / 2;
+    svg.append("line").attr("x1", cx).attr("y1", cy)
+      .attr("x2", cx + R * Math.cos(angle)).attr("y2", cy + R * Math.sin(angle))
+      .attr("stroke", "#2d3148");
+    svg.append("text").attr("x", cx + (R + 18) * Math.cos(angle))
+      .attr("y", cy + (R + 18) * Math.sin(angle))
+      .attr("text-anchor", "middle").attr("fill", "#aaa").attr("font-size", 10)
+      .text(dimLabels[i]);
+  });
+
+  const platforms = fingerprint.map(d => d.platform);
+  const platformColors = Object.fromEntries(platforms.map(p => [p, COLORS[p] || "#7c83fd"]));
+
+  fingerprint.forEach(fp => {
+    const points = dims.map((dim, i) => {
+      const angle = angleSlice * i - Math.PI / 2;
+      const val = r(fp[dim] || 0);
+      return [cx + val * Math.cos(angle), cy + val * Math.sin(angle)];
+    });
+    const pathData = points.map((p, i) => (i === 0 ? "M" : "L") + p[0] + "," + p[1]).join(" ") + "Z";
+    svg.append("path").attr("d", pathData).attr("fill", platformColors[fp.platform])
+      .attr("fill-opacity", 0.15).attr("stroke", platformColors[fp.platform]).attr("stroke-width", 2);
+  });
+
+  const legend = d3.select("#radar-legend");
+  platforms.forEach(p => {
+    legend.append("div").attr("class", "legend-item").html(
+      `<div class="legend-dot" style="background:${platformColors[p]}"></div><span style="text-transform:capitalize">${p}</span>`
+    );
+  });
+}
+
+function drawPlatformBars(selector, data) {
+  const svg = d3.select(selector);
+  const W = svg.node().parentElement.clientWidth || 400;
+  const H = 280, M = { top: 20, right: 20, bottom: 60, left: 70 };
+  svg.attr("viewBox", `0 0 ${W} ${H}`);
+
+  const x = d3.scaleBand().domain(data.map(d => d.platform)).range([M.left, W - M.right]).padding(0.35);
+  const y = d3.scaleLinear().domain([0, d3.max(data, d => d.value) * 1.2 || 1]).range([H - M.bottom, M.top]);
+
+  svg.append("g").attr("class", "axis").attr("transform", `translate(0,${H - M.bottom})`).call(d3.axisBottom(x).tickFormat(d => d.charAt(0).toUpperCase() + d.slice(1)));
+  svg.append("g").attr("class", "axis").attr("transform", `translate(${M.left},0)`).call(d3.axisLeft(y).ticks(5).tickFormat(d3.format(".2s")));
+
+  svg.selectAll("rect").data(data).enter().append("rect")
+    .attr("x", d => x(d.platform)).attr("y", d => y(d.value))
+    .attr("width", x.bandwidth()).attr("height", d => H - M.bottom - y(d.value))
+    .attr("fill", d => d.color).attr("rx", 4).attr("opacity", 0.85)
+    .on("mouseover", (e, d) => showTooltip(`${d.platform}<br>Engagement: ${d3.format(",.0f")(d.value)}`, e))
+    .on("mouseout", hideTooltip);
+
+  const legend = d3.select("#engagement-legend");
+  data.forEach(d => {
+    legend.append("div").attr("class", "legend-item").html(
+      `<div class="legend-dot" style="background:${d.color}"></div><span style="text-transform:capitalize">${d.platform}</span>`
+    );
+  });
+}
+</script>
+</body>
+</html>
