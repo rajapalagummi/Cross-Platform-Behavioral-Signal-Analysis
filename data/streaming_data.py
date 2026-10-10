@@ -144,7 +144,7 @@ def compute_session_features(sessions_df: pd.DataFrame) -> pd.DataFrame:
         counts = Counter(genres)
         total = sum(counts.values())
         probs = [c / total for c in counts.values()]
-        return -sum(p * np.log2(p + 1e-9) for p in probs)
+        return max(0.0, -sum(p * np.log2(p + 1e-9) for p in probs))
 
     agg = sessions_df.groupby(["user_id", "session_id", "session_date", "cohort"]).agg(
         n_tracks=("genre", "count"),

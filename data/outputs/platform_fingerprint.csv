@@ -1,0 +1,4 @@
+platform,content_volume,engagement,quality,diversity,consistency
+apple,0.9411764705882353,0.0,,0.2216,0.5
+youtube,0.8927335640138409,1.0,1.0,0.0,0.5
+spotify,1.0,0.06810743796144267,0.001336206896551724,0.8622,0.2387

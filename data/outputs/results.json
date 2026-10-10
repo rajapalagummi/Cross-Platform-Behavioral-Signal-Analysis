@@ -1,0 +1,164 @@
+{
+  "mode": "demo",
+  "session_stats": {
+    "n_sessions": 4410,
+    "n_users": 200,
+    "avg_entropy": 2.2204,
+    "median_entropy": 2.2516,
+    "overall_return_rate": 0.5689,
+    "high_diversity_return_rate": 0.5841,
+    "low_diversity_return_rate": 0.5542
+  },
+  "causal": {
+    "did": {
+      "did_estimate": -0.0159,
+      "se": 0.0149,
+      "t_stat": -1.0693,
+      "p_value": 0.2849,
+      "ci_lower": -0.0452,
+      "ci_upper": 0.0133,
+      "significant": false,
+      "treat_return_rate_post": 0.5524,
+      "ctrl_return_rate_post": 0.5309,
+      "n_treatment": 2169,
+      "n_control": 2241
+    },
+    "psm": {
+      "psm_ate": 0.0383,
+      "psm_t_stat": 2.5432,
+      "psm_p_value": 0.011,
+      "psm_significant": true,
+      "n_matched": 2169,
+      "n_treated": 2169
+    },
+    "bayesian": {
+      "prob_treatment_better": 0.9775,
+      "median_delta": 0.0302,
+      "hdi_lower": 0.0008,
+      "hdi_upper": 0.0594,
+      "treat_return_rate": 0.5841,
+      "ctrl_return_rate": 0.5542,
+      "n_treat": 2169,
+      "n_ctrl": 2241
+    },
+    "parallel_trends": {
+      "parallel_trends_pvalue": 0.8988,
+      "parallel_trends_satisfied": true
+    }
+  },
+  "crossplatform": {
+    "fingerprint": [
+      {
+        "platform": "apple",
+        "content_volume": 0.9411764705882353,
+        "engagement": 0.0,
+        "quality": NaN,
+        "diversity": 0.2216,
+        "consistency": 0.5
+      },
+      {
+        "platform": "youtube",
+        "content_volume": 0.8927335640138409,
+        "engagement": 1.0,
+        "quality": 1.0,
+        "diversity": 0.0,
+        "consistency": 0.5
+      },
+      {
+        "platform": "spotify",
+        "content_volume": 1.0,
+        "engagement": 0.06810743796144267,
+        "quality": 0.001336206896551724,
+        "diversity": 0.8622,
+        "consistency": 0.2387
+      }
+    ],
+    "statistical_tests": {
+      "apple_vs_youtube_content_count": {
+        "platform_1": "apple",
+        "platform_2": "youtube",
+        "metric": "content_count",
+        "ks_statistic": 0.2,
+        "ks_pvalue": 0.5661,
+        "cohens_d": 0.2985,
+        "significant": false,
+        "p1_median": 272.0,
+        "p2_median": 258.0
+      },
+      "apple_vs_youtube_engagement_proxy": {
+        "platform_1": "apple",
+        "platform_2": "youtube",
+        "metric": "engagement_proxy",
+        "ks_statistic": 1.0,
+        "ks_pvalue": 0.0,
+        "cohens_d": -1.1426,
+        "significant": true,
+        "p1_median": 0.0,
+        "p2_median": 450083.0
+      },
+      "apple_vs_spotify_content_count": {
+        "platform_1": "apple",
+        "platform_2": "spotify",
+        "metric": "content_count",
+        "ks_statistic": 0.2,
+        "ks_pvalue": 0.3959,
+        "cohens_d": 0.2954,
+        "significant": false,
+        "p1_median": 272.0,
+        "p2_median": 289.0
+      },
+      "apple_vs_spotify_engagement_proxy": {
+        "platform_1": "apple",
+        "platform_2": "spotify",
+        "metric": "engagement_proxy",
+        "ks_statistic": 1.0,
+        "ks_pvalue": 0.0,
+        "cohens_d": -0.4769,
+        "significant": true,
+        "p1_median": 0.0,
+        "p2_median": 30654.0
+      },
+      "youtube_vs_spotify_content_count": {
+        "platform_1": "youtube",
+        "platform_2": "spotify",
+        "metric": "content_count",
+        "ks_statistic": 0.25,
+        "ks_pvalue": 0.3995,
+        "cohens_d": -0.0236,
+        "significant": false,
+        "p1_median": 258.0,
+        "p2_median": 289.0
+      },
+      "youtube_vs_spotify_engagement_proxy": {
+        "platform_1": "youtube",
+        "platform_2": "spotify",
+        "metric": "engagement_proxy",
+        "ks_statistic": 0.7833,
+        "ks_pvalue": 0.0,
+        "cohens_d": 1.0518,
+        "significant": true,
+        "p1_median": 450083.0,
+        "p2_median": 30654.0
+      }
+    },
+    "platform_summary": {
+      "apple": {
+        "n_shows": 50,
+        "median_content_count": 272.0,
+        "median_engagement": 0.0
+      },
+      "youtube": {
+        "n_shows": 20,
+        "median_content_count": 258.0,
+        "median_engagement": 450083.0
+      },
+      "spotify": {
+        "n_shows": 30,
+        "median_content_count": 289.0,
+        "median_engagement": 30654.0
+      }
+    },
+    "n_platforms": 3,
+    "topic": "technology"
+  }
+}
